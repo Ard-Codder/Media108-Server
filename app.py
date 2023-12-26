@@ -2,6 +2,7 @@ from flask import Flask, render_template, request
 import json
 import numpy
 import torch
+import io
 import os  # для работы с операционной системой
 import pandas as pd  # для работы с таблицами
 import numpy as np  # для работы с массивами
@@ -45,6 +46,7 @@ class BERT_Arch(nn.Module):
 
 
 app = Flask(__name__)
+app.config['UPLOAD_FOLDER'] = 'C:/Users/kirar/PycharmProjects/Media108-Server/'
 
 # Загрузка модели whisper medium
 whisper_model = whisper.load_model('medium')
@@ -70,14 +72,14 @@ model = BERT_Arch(bert)
 model = model.to(device)
 
 # Загрузим лучшие веса для модели
-model.load_state_dict(torch.load('/content/drive/MyDrive/Media_108/Bert_веса/bert_weights.pt'))
+model.load_state_dict(torch.load('C:/Users/kirar/Downloads/bert_weights.pt'))
 tokenizer = AutoTokenizer.from_pretrained('DeepPavlov/rubert-base-cased-sentence')
 
 
 # Функция для определения класса по аудио
-def prediction(audio):
+def prediction(audio_path):
     # Whisper-транскрибация
-    text_whisper = whisper_model.transcribe(audio, language='ru')['text']
+    text_whisper = whisper_model.transcribe(audio_path, language='ru')['text']
     print(text_whisper)
 
     # Bert-предсказание
@@ -118,10 +120,10 @@ def prediction(audio):
     # а [0.5, 1] - ЦЕЛЕВОЙ
 
     if confidence >= 0.5:
-        return f'Звонок, путь до которого {audio} — ЦЕЛЕВОЙ\nВероятность Целевого - {confidence},' \
+        return f'Звонок, путь до которого {audio_path} — ЦЕЛЕВОЙ\nВероятность Целевого - {confidence},' \
                f' Нецелевого - {1 - confidence}'
     else:
-        return f'Звонок, путь до которого {audio} — НЕЦЕЛЕВОЙ\nВероятность Целевого - {confidence},' \
+        return f'Звонок, путь до которого {audio_path} — НЕЦЕЛЕВОЙ\nВероятность Целевого - {confidence},' \
                f' Нецелевого - {1 - confidence}'
 
 
@@ -130,7 +132,10 @@ def prediction(audio):
 def index():
     if request.method == 'POST':
         audio = request.files['audio']
-        target_class = prediction(audio)
+        path_audio = os.path.join(app.config['UPLOAD_FOLDER'], 'audio.mp3')
+        audio.save(path_audio)
+        target_class = prediction(path_audio)
+        os.remove(path_audio)  # Удаление файла после обработки
         return render_template('result.html', target_class=target_class)
     return render_template('index.html')
 
